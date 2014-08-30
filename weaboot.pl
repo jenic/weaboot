@@ -16,15 +16,23 @@ use POE::Component::IRC;
 
 my $nick = "rycr" . ($$ % 1000);
 
+sub _stop;
+sub irc_notice;
+sub irc_msg;
+
+END { $poe_kernel->call('test', 'quit', 'thanks!') }
+
 # Expected args format:
 # <>    <0>         <1>     <2>
 # <cmd> <packid>    <bot>   <channel> [ <server> ] [ <port> ]
 
-my $pack = $ARGV[0] || undef;
+my @pack = split ',', $ARGV[0] || undef;
 my $bot = $ARGV[1] || 'CR-CA|NEW';
 my $chan = $ARGV[2] || '#horriblesubs';
+my $i = 0;
 
-die "NEED PACK NUMBER!" unless $pack;
+die "NEED PACK NUMBER!" unless @pack;
+print "Fetching packs @pack from $bot in $chan\n";
 
 # This gets executed as soon as the kernel sets up this session.
 sub _start {
@@ -34,15 +42,17 @@ sub _start {
   # is the easy, indiscriminate way to do it.
   $kernel->post( 'test', 'register', 'all');
 
-  # Setting Debug to 1 causes P::C::IRC to print all raw lines of text
-  # sent to and received from the IRC server. Very useful for debugging.
-  $kernel->post( 'test', 'connect', { Debug    => 1,
-				      Nick     => $nick,
-                      Server   => $ARGV[3] || 'irc.rizon.net',
-				      Port     => $ARGV[4] || 6667,
-				      Username => 'rycr',
-				      Ircname  => 'iambestgirl', }
-	       );
+    # Setting Debug to 1 causes P::C::IRC to print all raw lines of text
+    # sent to and received from the IRC server. Very useful for debugging.
+    $kernel->post( 'test', 'connect',
+                { Debug    => 0
+                , Nick     => $nick,
+                , Server   => $ARGV[3] || 'irc.rizon.net',
+                , Port     => $ARGV[4] || 6667,
+                , Username => 'rycr',
+                , Ircname  => 'iambestgirl'
+                }
+    );
 }
 
 
@@ -52,12 +62,16 @@ sub irc_001 {
 
   $kernel->post( 'test', 'mode', $nick, '+i' );
   $kernel->post( 'test', 'join', $chan );
-  $kernel->post( 'test', 'privmsg', $bot, "xdcc send $pack" );
+  print "Asking $bot for @pack\n";
+  $kernel->post( 'test', 'privmsg', $bot, "xdcc send $_" ) for (@pack);
 }
 
 sub irc_dcc_done {
   my ($magic, $nick, $type, $port, $file, $size, $done) = @_[ARG0 .. ARG6];
-  print "DCC $type to $nick ($file) done: $done bytes transferred.\n",
+  print "DCC $type to $nick ($file) done: $done bytes transferred.\n";
+  # TODO: Close session
+  $i++;
+  exit if ($i == @pack);
 }
 
 
@@ -80,18 +94,25 @@ sub irc_disconnected {
   print "Lost connection to server $server.\n";
 }
 
+sub irc_msg {
+    my ($kernel, $who, $chan, $msg) = @_[KERNEL, ARG0 .. ARG2];
+    print "MSG from $who ($chan): $msg\n";
+}
+
+sub irc_notice {
+    my ($kernel, $who, $chan, $msg) = @_[KERNEL, ARG0 .. ARG2];
+    print "NOTICE from $who (@$chan): $msg\n";
+}
 
 sub irc_error {
   my $err = $_[ARG0];
   print "Server error occurred! $err\n";
 }
 
-
 sub irc_socketerr {
   my $err = $_[ARG0];
   print "Couldn't connect to server: $err\n";
 }
-
 
 sub irc_kick {
   my ($who, $where, $isitme, $reason) = @_[ARG0 .. ARG4];
@@ -112,11 +133,12 @@ sub irc_dcc_request {
 
 # here's where execution starts.
 
-POE::Component::IRC->new( 'test' ) or
+POE::Component::IRC->spawn( 'test' ) or
   die "Can't instantiate new IRC component!\n";
 POE::Session->create( package_states => [ 'main' => [
             qw(_start _stop irc_001 irc_kick irc_disconnected irc_error
-            irc_socketerr irc_dcc_done irc_dcc_error irc_dcc_request)
+            irc_notice irc_socketerr irc_dcc_done irc_dcc_error
+            irc_dcc_request irc_msg)
         ],],
 );
 $poe_kernel->run();
