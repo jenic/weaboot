@@ -36,11 +36,11 @@ print "Fetching packs @pack from $bot in $chan\n";
 
 # This gets executed as soon as the kernel sets up this session.
 sub _start {
-  my ($kernel, $session) = @_[KERNEL, SESSION];
+    my ($kernel, $session) = @_[KERNEL, SESSION];
 
-  # Ask the IRC component to send us all IRC events it receives. This
-  # is the easy, indiscriminate way to do it.
-  $kernel->post( 'test', 'register', 'all');
+    # Ask the IRC component to send us all IRC events it receives. This
+    # is the easy, indiscriminate way to do it.
+    $kernel->post( 'test', 'register', 'all');
 
     # Setting Debug to 1 causes P::C::IRC to print all raw lines of text
     # sent to and received from the IRC server. Very useful for debugging.
@@ -58,40 +58,40 @@ sub _start {
 
 # After we successfully log into the IRC server, join a channel.
 sub irc_001 {
-  my ($kernel) = $_[KERNEL];
+    my ($kernel) = $_[KERNEL];
 
-  $kernel->post( 'test', 'mode', $nick, '+i' );
-  $kernel->post( 'test', 'join', $chan );
-  print "Asking $bot for @pack\n";
-  $kernel->post( 'test', 'privmsg', $bot, "xdcc send $_" ) for (@pack);
+    $kernel->post( 'test', 'mode', $nick, '+i' );
+    $kernel->post( 'test', 'join', $chan );
+    print "Asking $bot for @pack\n";
+    $kernel->post( 'test', 'privmsg', $bot, "xdcc send $_" ) for (@pack);
 }
 
 sub irc_dcc_done {
-  my ($magic, $nick, $type, $port, $file, $size, $done) = @_[ARG0 .. ARG6];
-  print "DCC $type to $nick ($file) done: $done bytes transferred.\n";
-  # TODO: Close session
-  $i++;
-  exit if ($i == @pack);
+    my ($magic, $nick, $type, $port, $file, $size, $done) = @_[ARG0 .. ARG6];
+    print "DCC $type to $nick ($file) done: $done bytes transferred.\n";
+    # TODO: Close session
+    $i++;
+    exit if ($i == @pack);
 }
 
 
 sub irc_dcc_error {
-  my ($err, $nick, $type, $file) = @_[ARG0 .. ARG2, ARG4];
-  print "DCC $type to $nick ($file) failed: $err.\n",
+    my ($err, $nick, $type, $file) = @_[ARG0 .. ARG2, ARG4];
+    print "DCC $type to $nick ($file) failed: $err.\n",
 }
 
 
 sub _stop {
-  my ($kernel) = $_[KERNEL];
+    my ($kernel) = $_[KERNEL];
 
-  print "Control session stopped.\n";
-  $kernel->call( 'test', 'quit', 'thanks!' );
+    print "Control session stopped.\n";
+    $kernel->call( 'test', 'quit', 'thanks!' );
 }
 
 
 sub irc_disconnected {
-  my ($server) = $_[ARG0];
-  print "Lost connection to server $server.\n";
+    my ($server) = $_[ARG0];
+    print "Lost connection to server $server.\n";
 }
 
 sub irc_msg {
@@ -105,36 +105,36 @@ sub irc_notice {
 }
 
 sub irc_error {
-  my $err = $_[ARG0];
-  print "Server error occurred! $err\n";
+    my $err = $_[ARG0];
+    print "Server error occurred! $err\n";
 }
 
 sub irc_socketerr {
-  my $err = $_[ARG0];
-  print "Couldn't connect to server: $err\n";
+    my $err = $_[ARG0];
+    print "Couldn't connect to server: $err\n";
 }
 
 sub irc_kick {
-  my ($who, $where, $isitme, $reason) = @_[ARG0 .. ARG4];
+    my ($who, $where, $isitme, $reason) = @_[ARG0 .. ARG4];
 
-  print "Kicked from $where by $who: $reason\n" if $isitme eq $nick;
+    print "Kicked from $where by $who: $reason\n" if $isitme eq $nick;
 }
 
 sub irc_dcc_request {
-  my ($kernel, $nick, $type, $port, $magic, $filename, $size) =
+    my ($kernel, $nick, $type, $port, $magic, $filename, $size) =
     @_[KERNEL, ARG0 .. ARG5];
 
-  print "DCC $type request from $nick on port $port\n";
-  $nick = ($nick =~ /^([^!]+)/);
-  $nick =~ s/\W//;
-  $kernel->post( 'test', 'dcc_accept', $magic, "$1.$filename" );
+    print "DCC $type request from $nick on port $port\n";
+    $nick = ($nick =~ /^([^!]+)/);
+    $nick =~ s/\W//;
+    $kernel->post( 'test', 'dcc_accept', $magic, "$1.$filename" );
 }
 
 
 # here's where execution starts.
 
 POE::Component::IRC->spawn( 'test' ) or
-  die "Can't instantiate new IRC component!\n";
+    die "Can't instantiate new IRC component!\n";
 POE::Session->create( package_states => [ 'main' => [
             qw(_start _stop irc_001 irc_kick irc_disconnected irc_error
             irc_notice irc_socketerr irc_dcc_done irc_dcc_error
