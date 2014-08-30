@@ -59,11 +59,17 @@ sub _start {
 # After we successfully log into the IRC server, join a channel.
 sub irc_001 {
     my ($kernel) = $_[KERNEL];
+    my $sender = $_[SENDER];
+    my $irc = $sender->get_heap();
+
+    print "Connected to ", $irc->server_name(), "\n";
 
     $kernel->post( 'test', 'mode', $nick, '+i' );
     $kernel->post( 'test', 'join', $chan );
     print "Asking $bot for @pack\n";
     $kernel->post( 'test', 'privmsg', $bot, "xdcc send $_" ) for (@pack);
+
+    return;
 }
 
 sub irc_dcc_done {
@@ -96,12 +102,12 @@ sub irc_disconnected {
 
 sub irc_msg {
     my ($kernel, $who, $chan, $msg) = @_[KERNEL, ARG0 .. ARG2];
-    print "MSG from $who ($chan): $msg\n";
+    print "MSG from $who: $msg\n";
 }
 
 sub irc_notice {
     my ($kernel, $who, $chan, $msg) = @_[KERNEL, ARG0 .. ARG2];
-    print "NOTICE from $who (@$chan): $msg\n";
+    print "NOTICE from $who: $msg\n";
 }
 
 sub irc_error {
@@ -133,13 +139,17 @@ sub irc_dcc_request {
 
 # here's where execution starts.
 
-POE::Component::IRC->spawn( 'test' ) or
-    die "Can't instantiate new IRC component!\n";
+my $irc = POE::Component::IRC->spawn(
+    alias=>'test'
+) or die "Can't instantiate new IRC component: $!\n";
+
 POE::Session->create( package_states => [ 'main' => [
             qw(_start _stop irc_001 irc_kick irc_disconnected irc_error
             irc_notice irc_socketerr irc_dcc_done irc_dcc_error
             irc_dcc_request irc_msg)
-        ],],
+            ],
+        ],
+        heap => { irc => $irc },
 );
 $poe_kernel->run();
 
