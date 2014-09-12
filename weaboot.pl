@@ -10,9 +10,7 @@
 
 use strict;
 use lib $ENV{HOME} . '/lib/perl/';
-use POE::Kernel;
-use POE::Session;
-use POE::Component::IRC;
+use POE qw(Component::IRC);
 
 my $nick = "rycr" . ($$ % 1000);
 
@@ -29,45 +27,52 @@ END { $poe_kernel->call('test', 'quit', 'thanks!') }
 my @pack = split ',', $ARGV[0] || undef;
 my $bot = $ARGV[1] || 'CR-CA|NEW';
 my $chan = $ARGV[2] || '#horriblesubs';
+my $limit = 4;
 my $i = 0;
+my $xdcc_send;
 
 die "NEED PACK NUMBER!" unless @pack;
 print "Fetching packs @pack from $bot in $chan\n";
 
+# Helper for sending requests
+sub xdcc {
+    my $irc = shift;
+    my @stack = (@_);
+
+    return sub {
+        my $bot = shift;
+        my @slice = splice @stack, 0, $limit;
+        print "Asking $bot for @slice\n";
+        $irc->yield( privmsg => $bot => "xdcc send $_" )
+            for (@slice);
+    };
+}
+
 # This gets executed as soon as the kernel sets up this session.
 sub _start {
-    my ($kernel, $session) = @_[KERNEL, SESSION];
+    my $heap = $_[HEAP];
+    my $irc = $heap->{irc};
+    $xdcc_send = xdcc($irc, @pack);
 
     # Ask the IRC component to send us all IRC events it receives. This
     # is the easy, indiscriminate way to do it.
-    $kernel->post( 'test', 'register', 'all');
+    $irc->yield( register => 'all' );
+    $irc->yield( 'connect' );
 
-    # Setting Debug to 1 causes P::C::IRC to print all raw lines of text
-    # sent to and received from the IRC server. Very useful for debugging.
-    $kernel->post( 'test', 'connect',
-                { Debug    => 0
-                , Nick     => $nick,
-                , Server   => $ARGV[3] || 'irc.rizon.net',
-                , Port     => $ARGV[4] || 6667,
-                , Username => 'rycr',
-                , Ircname  => 'iambestgirl'
-                }
-    );
+    return;
 }
 
 
 # After we successfully log into the IRC server, join a channel.
 sub irc_001 {
-    my ($kernel) = $_[KERNEL];
     my $sender = $_[SENDER];
     my $irc = $sender->get_heap();
 
     print "Connected to ", $irc->server_name(), "\n";
 
-    $kernel->post( 'test', 'mode', $nick, '+i' );
-    $kernel->post( 'test', 'join', $chan );
-    print "Asking $bot for @pack\n";
-    $kernel->post( 'test', 'privmsg', $bot, "xdcc send $_" ) for (@pack);
+    $irc->yield( mode => $nick => '+i' );
+    $irc->yield( join => $chan );
+    $xdcc_send->($bot);
 
     return;
 }
@@ -78,6 +83,7 @@ sub irc_dcc_done {
     # TODO: Close session
     $i++;
     exit if ($i == @pack);
+    $xdcc_send->($bot);
 }
 
 
@@ -96,8 +102,11 @@ sub _stop {
 
 
 sub irc_disconnected {
-    my ($server) = $_[ARG0];
+    my ($server, $heap) = @_[ARG0, HEAP];
+    my $irc = $heap->{irc};
     print "Lost connection to server $server.\n";
+
+    $irc->yield(connect=>{});
 }
 
 sub irc_msg {
@@ -133,6 +142,7 @@ sub irc_dcc_request {
     print "DCC $type request from $nick on port $port\n";
     $nick = ($nick =~ /^([^!]+)/);
     $nick =~ s/\W//;
+    # Todo: nick check
     $kernel->post( 'test', 'dcc_accept', $magic, "$1.$filename" );
 }
 
@@ -140,7 +150,14 @@ sub irc_dcc_request {
 # here's where execution starts.
 
 my $irc = POE::Component::IRC->spawn(
-    alias=>'test'
+    debug=>1,
+    plugin_debug=>0,
+    alias=>'test',
+    nick=>$nick,
+    server=>$ARGV[3] || 'irc.rizon.net',
+    port=>$ARGV[4] || 6667,
+    username=>$nick,
+    ircname=>'ircpls'
 ) or die "Can't instantiate new IRC component: $!\n";
 
 POE::Session->create( package_states => [ 'main' => [
