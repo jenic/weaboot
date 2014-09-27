@@ -42,7 +42,9 @@ sub xdcc {
     return sub {
         my $bot = shift;
         my @slice = splice @stack, 0, $limit;
+        return unless @slice;
         print "Asking $bot for @slice\n";
+        print @stack . " left in stack\n";
         $irc->yield( privmsg => $bot => "xdcc send $_" )
             for (@slice);
     };
@@ -63,7 +65,7 @@ sub _start {
 }
 
 
-# After we successfully log into the IRC server, join a channel.
+# 001 means we have successfully passed connection and registration phase
 sub irc_001 {
     my $sender = $_[SENDER];
     my $irc = $sender->get_heap();
@@ -140,9 +142,12 @@ sub irc_dcc_request {
     @_[KERNEL, ARG0 .. ARG5];
 
     print "DCC $type request from $nick on port $port\n";
-    $nick = ($nick =~ /^([^!]+)/);
-    $nick =~ s/\W//;
-    # Todo: nick check
+    $nick = ($nick =~ /^([^!]+)/)[0];
+    if (lc($nick) ne lc($bot)) {
+        print "Request not expected. Expected request from $bot, got $nick\n";
+        return;
+    }
+
     $kernel->post( 'test', 'dcc_accept', $magic, "$1.$filename" );
 }
 
@@ -150,7 +155,7 @@ sub irc_dcc_request {
 # here's where execution starts.
 
 my $irc = POE::Component::IRC->spawn(
-    debug=>1,
+    debug=>0,
     plugin_debug=>0,
     alias=>'test',
     nick=>$nick,
