@@ -25,7 +25,7 @@ END { $poe_kernel->call('test', 'quit', 'thanks!') }
 # <cmd> <packid>    <bot>   <channel> [ <server> ] [ <port> ]
 
 my @pack = split ',', $ARGV[0] || undef;
-my $bot = $ARGV[1] || 'CR-CA|NEW';
+my $bot = $ARGV[1] || 'CR-TEXAS|NEW';
 my $chan = $ARGV[2] || '#horriblesubs';
 my $limit = 4;
 my $i = 0;
@@ -155,7 +155,8 @@ sub irc_dcc_request {
 # here's where execution starts.
 
 my $irc = POE::Component::IRC->spawn(
-    debug=>0,
+    debug=> $ENV{DEBUG} || 0,
+    options=> { trace => $ENV{TRACE} || 0 },
     plugin_debug=>0,
     alias=>'test',
     nick=>$nick,
