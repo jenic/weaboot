@@ -11,8 +11,8 @@
 use strict;
 use lib $ENV{HOME} . '/lib/perl/';
 use POE qw(Component::IRC);
-
-my $nick = "rycr" . ($$ % 1000);
+use Getopt::Long;
+use Pod::Usage;
 
 sub _stop;
 sub irc_notice;
@@ -24,12 +24,31 @@ END { $poe_kernel->call('test', 'quit', 'thanks!') }
 # <>    <0>         <1>     <2>
 # <cmd> <packid>    <bot>   <channel> [ <server> ] [ <port> ]
 
-my @pack = split ',', $ARGV[0] || undef;
-my $bot = $ARGV[1] || 'CR-TEXAS|NEW';
-my $chan = $ARGV[2] || '#horriblesubs';
-my $limit = 4;
+my @pack;
+my $bot = 'CR-TEXAS|NEW';
+my $chan = '#horriblesubs';
+my $limit = 2;
+my $nick = "rycr" . ($$ % 1000);
+my $server = 'irc.rizon.net';
+my $port = 6667;
+
 my $i = 0;
-my $xdcc_send;
+my ($xdcc_send, $help, $man);
+
+GetOptions
+( 'packs=s{1,}' => \@pack
+, 'bot=s' => \$bot
+, 'channel=s' => \$chan
+, 'limit=i' => \$limit
+, 'nickname=s' => \$nick
+, 'server=s' => \$server
+, 'port=i' => \$port
+, 'help|?' => \$help
+, man => \$man
+) or pod2usage(2);
+
+pod2usage(1) if $help;
+pod2usage(-exitval => 0, -verbose => 2) if $man;
 
 die "NEED PACK NUMBER!" unless @pack;
 print "Fetching packs @pack from $bot in $chan\n";
@@ -160,8 +179,8 @@ my $irc = POE::Component::IRC->spawn(
     plugin_debug=>0,
     alias=>'test',
     nick=>$nick,
-    server=>$ARGV[3] || 'irc.rizon.net',
-    port=>$ARGV[4] || 6667,
+    server=>$server,
+    port=>$port,
     username=>$nick,
     ircname=>'ircpls'
 ) or die "Can't instantiate new IRC component: $!\n";
@@ -177,3 +196,72 @@ POE::Session->create( package_states => [ 'main' => [
 $poe_kernel->run();
 
 exit 0;
+
+__END__
+
+=head1 weaboot
+
+Weaboo XDCC Leech Bot
+
+=head1 SYNOPSIS
+
+weaboot --packs 1 [2 3 ...] [ --nick bob ] [ --limit <number> ] [ --bot <name> ] [ --channel <name> ]
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-help>
+
+Print a brief help message and exit
+
+=item B<-man>
+
+Prints the manual page and exits
+
+=item B<-nick>
+
+The IRC nickname to use
+Default: rycr<PID %% 1000>
+
+=item B<-limit>
+
+The integer limit for how many packs to request at one time
+Default: 2
+
+=item B<-bot>
+
+The name of the bot to request packs from. Default: CR-TEXAS|NEW
+
+=item B<-channel>
+
+The channel to join before requesting packs from the bot. This is typically
+because bots will check that you are in a channel they are in before accepting
+XDCC requests.
+Default: #horriblesubs
+
+=item B<-packs>
+
+List of packs to request expressed as space separated values.
+Required argument.
+Example: weaboot --packs 321 231 123
+
+=item B<-server>
+
+IRC server to connect to
+Default: irc.rizon.net
+
+=item B<-port>
+
+Port to connect to irc server on
+Default: 6667
+
+=back
+
+=head1 DESCRIPTION
+
+B<weaboot> will connect to the given irc network to request XDCC packs from a
+bot within a channel. This is to facilitate mass downloads when packlist
+support is not functional. (Which is all the time)
+
+=cut
