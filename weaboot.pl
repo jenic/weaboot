@@ -25,7 +25,7 @@ END { $poe_kernel->call('test', 'quit', 'thanks!') }
 # <cmd> <packid>    <bot>   <channel> [ <server> ] [ <port> ]
 
 my @pack;
-my $bot = 'CR-TEXAS|NEW';
+my $bot = $ENV{BOT} || 'CR-TEXAS|NEW';
 my $chan = '#horriblesubs';
 my $limit = 2;
 my $nick = "rycr" . ($$ % 1000);
