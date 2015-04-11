@@ -51,7 +51,7 @@ pod2usage(1) if $help;
 pod2usage(-exitval => 0, -verbose => 2) if $man;
 
 die "NEED PACK NUMBER!" unless @pack;
-print "Fetching packs @pack from $bot in $chan\n";
+print "Fetching @pack from $bot in $chan on $server:$port (Limit $limit)\n";
 
 # Helper for sending requests
 sub xdcc {
